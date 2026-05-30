@@ -5,24 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>フランス語 語彙マスター 10000</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; color: #333; }
+        body { font-family: -apple-system, sans-serif; background-color: #ffffff; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; color: #333; }
         #setup-screen, #learn-screen { width: 100%; max-width: 400px; }
         #learn-screen { display: none; text-align: center; margin-top: 2vh; }
         h1 { font-size: 1.5em; color: #2c3e50; text-align: center; margin-bottom: 20px; }
         .select-box { width: 100%; padding: 15px; font-size: 1.1em; border-radius: 10px; border: 1px solid #ccc; margin-bottom: 20px; }
-        .fr-word { font-size: 2.8em; font-weight: bold; margin-bottom: 5px; }
-        .ja-section { visibility: hidden; opacity: 0; transition: opacity 0.2s ease; border-top: 1px solid #eee; padding-top: 20px; min-height: 250px; }
+        .fr-word { font-size: 2.5em; font-weight: bold; margin-bottom: 10px; }
+        .ja-section { visibility: hidden; opacity: 0; transition: opacity 0.3s; border-top: 2px solid #eee; padding-top: 20px; min-height: 200px; }
         .ja-section.show { visibility: visible; opacity: 1; }
         .synonyms-box { background: #eef2ff; color: #3730a3; padding: 10px; border-radius: 8px; font-weight: bold; margin: 15px 0; }
         .btn { padding: 15px; font-size: 1.1em; font-weight: bold; border: none; border-radius: 25px; cursor: pointer; color: white; width: 100%; margin-bottom: 10px; }
-        .slider-container { margin: 15px 0; font-size: 0.9em; color: #666; }
+        .slider-container { margin: 20px 0; color: #666; text-align: center; }
     </style>
 </head>
 <body>
 
     <div id="setup-screen">
-        <h1>📚 フランス語 語彙マスター</h1>
-        <div id="loading-msg">⏳ データを読み込み中...</div>
+        <h1>📚 語彙マスター</h1>
+        <div id="loading-msg">⏳ データ読み込み中...</div>
         <div id="menu-content" style="display: none;">
             <select id="list-select" class="select-box"></select>
             <div class="slider-container">
@@ -40,17 +40,26 @@
         <div id="ja-section" class="ja-section">
             <div id="ja-word" style="font-size:1.8em; font-weight:bold;"></div>
             <div id="synonyms-container" class="synonyms-box" style="display:none;">💡 類義語: <span id="synonyms-text"></span></div>
-            <div style="margin: 20px 0;">
-                <button class="btn" style="background-color: #f59e0b;" onclick="handleAction('weak')">⚠️ 苦手へ</button>
-                <button class="btn" style="background-color: #10b981;" onclick="handleAction('master')">★ マスター済</button>
+            <div style="display:flex; gap:10px;">
+                <button class="btn" style="background-color: #f59e0b; width:50%;" onclick="handleAction('weak')">⚠️ 苦手</button>
+                <button class="btn" style="background-color: #10b981; width:50%;" onclick="handleAction('master')">★ マスター</button>
             </div>
         </div>
-        <button class="btn" style="background-color: #6b7280; font-size: 1em;" onclick="goHome()">🏠 メニューに戻る</button>
+        <button class="btn" style="background-color: #6b7280;" onclick="goHome()">🏠 メニューに戻る</button>
     </div>
 
     <script>
-        let wordDatabase = {};
-        let currentList = [], currentIndex = 0, isPlaying = false, delaySeconds = 0.5, isReviewMode = false;
+        let wordDatabase = {}, currentList = [], currentIndex = 0, isPlaying = false, delaySeconds = 0.5;
+
+        async function speak(text, lang) {
+            return new Promise(resolve => {
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = lang;
+                u.rate = 0.9;
+                u.onend = resolve;
+                speechSynthesis.speak(u);
+            });
+        }
 
         window.onload = async () => {
             const res = await fetch('words.csv?v=' + new Date().getTime());
@@ -72,18 +81,13 @@
         };
 
         function startLearning() {
-            isReviewMode = false;
             const master = JSON.parse(localStorage.getItem('masterWords') || '[]');
-            const all = wordDatabase[document.getElementById('list-select').value].words;
-            currentList = all.filter(w => !master.some(m => m.fr === w.fr));
-            if(currentList.length === 0) return alert("すべてマスター済みです！");
+            currentList = wordDatabase[document.getElementById('list-select').value].words.filter(w => !master.some(m => m.fr === w.fr));
             launch();
         }
 
         function startReviewing() {
             currentList = JSON.parse(localStorage.getItem('weakWords') || '[]');
-            if(currentList.length === 0) return alert("苦手リストは空です");
-            isReviewMode = true;
             launch();
         }
 
@@ -95,34 +99,37 @@
             playLoop();
         }
 
-        function handleAction(type) {
-            const word = currentList[currentIndex];
-            let storage = JSON.parse(localStorage.getItem(type === 'weak' ? 'weakWords' : 'masterWords') || '[]');
-            if(!storage.some(w => w.fr === word.fr)) {
-                storage.push(word);
-                localStorage.setItem(type === 'weak' ? 'weakWords' : 'masterWords', JSON.stringify(storage));
-            }
-            alert(type === 'weak' ? "苦手に追加しました" : "マスターしました！");
-        }
-
         async function playLoop() {
             if(!isPlaying) return;
-            const word = currentList[currentIndex];
+            const word = currentList[currentIndex % currentList.length];
             document.getElementById('fr-word').innerText = word.fr;
             document.getElementById('ja-section').classList.remove('show');
             document.getElementById('synonyms-container').style.display = 'none';
             
-            await new Promise(r => setTimeout(r, 1000));
+            await speak(word.fr, 'fr-FR');
+            await new Promise(r => setTimeout(r, delaySeconds * 1000));
+            
             document.getElementById('ja-word').innerText = word.ja;
             if(word.synonyms) {
                 document.getElementById('synonyms-text').innerText = word.synonyms;
                 document.getElementById('synonyms-container').style.display = 'block';
             }
             document.getElementById('ja-section').classList.add('show');
+            await speak(word.ja, 'ja-JP');
+            await new Promise(r => setTimeout(r, 1000));
             
-            await new Promise(r => setTimeout(r, delaySeconds * 1000 + 2000));
-            currentIndex = (currentIndex + 1) % currentList.length;
+            currentIndex++;
             playLoop();
+        }
+
+        function handleAction(type) {
+            const word = currentList[currentIndex % currentList.length];
+            let storage = JSON.parse(localStorage.getItem(type === 'weak' ? 'weakWords' : 'masterWords') || '[]');
+            if(!storage.some(w => w.fr === word.fr)) {
+                storage.push(word);
+                localStorage.setItem(type === 'weak' ? 'weakWords' : 'masterWords', JSON.stringify(storage));
+                alert(type === 'weak' ? "苦手に追加" : "マスター済みに移動");
+            }
         }
 
         function updateDelay() { delaySeconds = document.getElementById('delay-slider').value; document.getElementById('delay-val').innerText = delaySeconds; }

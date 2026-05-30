@@ -18,18 +18,15 @@
             color: #333;
         }
         
-        /* 画面切り替え用のクラス */
         #setup-screen, #learn-screen { width: 100%; max-width: 400px; }
         #learn-screen { display: none; text-align: center; margin-top: 2vh; }
 
-        /* セットアップ画面のUI */
         h1 { font-size: 1.5em; color: #2c3e50; text-align: center; margin-bottom: 30px; }
         .select-box { width: 100%; padding: 15px; font-size: 1.1em; border-radius: 10px; border: 1px solid #ccc; margin-bottom: 20px; }
         
-        /* 学習画面のUI */
-        .male { color: #0052cc; } /* 青 */
-        .female { color: #e11d48; } /* 赤 */
-        .neutral { color: #333333; } /* 黒 */
+        .male { color: #0052cc; } 
+        .female { color: #e11d48; } 
+        .neutral { color: #333333; } 
 
         .fr-section { margin-bottom: 30px; min-height: 120px; }
         .fr-word { font-size: 2.8em; font-weight: bold; margin-bottom: 5px; }
@@ -56,13 +53,16 @@
         }
         .btn-start { background-color: #3b82f6; color: white; margin-top: 20px; }
         .btn-play { background-color: #10b981; color: white; }
-        .btn-weak { background-color: #f59e0b; color: white; visibility: hidden; } 
+        .btn-action { visibility: hidden; } 
         .btn-home { background-color: #6b7280; color: white; margin-top: 20px; font-size: 1em; padding: 10px; }
+        .btn-review { background-color: #8b5cf6; color: white; margin-top: 10px; }
         
         .slider-container { margin-top: 15px; font-size: 0.9em; color: #666; }
         input[type="range"] { width: 80%; }
         
         .status-bar { font-size: 0.9em; color: #888; margin-bottom: 15px; }
+
+        .weak-dashboard { margin-top: 40px; padding-top: 20px; border-top: 2px dashed #eee; text-align: center; }
     </style>
 </head>
 <body>
@@ -72,9 +72,9 @@
         
         <label for="list-select" style="font-weight:bold; color:#555;">カテゴリー（レベル別）</label>
         <select id="list-select" class="select-box">
-            <option value="A1_verbs">A1 基礎・最重要動詞 (20語)</option>
-            <option value="A1_nouns_people">A1 人・家族に関する名詞 (15語)</option>
-            <option value="A1_nouns_time">A1 時間・場所に関する名詞 (15語)</option>
+            <option value="A1_verbs">A1 基礎・最重要動詞 (5語)</option>
+            <option value="A1_nouns_people">A1 人・家族に関する名詞 (5語)</option>
+            <option value="A1_nouns_time">A1 時間・場所に関する名詞 (5語)</option>
         </select>
 
         <div class="slider-container" style="text-align: center;">
@@ -84,10 +84,15 @@
         </div>
 
         <button class="btn btn-start" onclick="startLearning()">学習を開始する</button>
+
+        <div class="weak-dashboard">
+            <p style="font-weight:bold; color:#555; margin-bottom: 5px;">⚠️ 苦手リスト: <span id="weak-count" style="font-size:1.5em; color:#f59e0b;">0</span> 語</p>
+            <button id="review-btn" class="btn btn-review" onclick="startReviewing()">苦手リストを復習する</button>
+        </div>
     </div>
 
     <div id="learn-screen">
-        <div class="status-bar" id="status-bar">リスト: 未選択 (1/10)</div>
+        <div class="status-bar" id="status-bar"></div>
         
         <div class="fr-section">
             <div id="fr-word" class="fr-word neutral"></div>
@@ -103,14 +108,13 @@
         </div>
 
         <div class="controls">
-            <button id="weak-btn" class="btn btn-weak" onclick="markAsWeak()">⚠️ 苦手リストに追加</button>
+            <button id="action-btn" class="btn btn-action" onclick="handleAction()">アクション</button>
             <button id="play-btn" class="btn btn-play" onclick="togglePlay()">■ ストップ</button>
             <button class="btn btn-home" onclick="goHome()">🏠 メニューに戻る</button>
         </div>
     </div>
 
     <script>
-        // 単語データベース（1万語でもここに追加・分割していけます）
         const wordDatabase = {
             "A1_verbs": [
                 { fr: "être", ipa: "[ɛtʁ]", ja: "〜である・いる", en: "be", level: "A1", ex_fr: "Je suis là.", ex_ja: "私はここにいる。", note: "英語のbe動詞に相当する超基本動詞。", gender: "neutral" },
@@ -139,42 +143,87 @@
         let currentIndex = 0;
         let isPlaying = false;
         let delaySeconds = 0.5;
+        let isReviewMode = false; // 苦手リストの復習中かどうか
 
-        // メニュー画面でのスライダー更新
+        // ページ読み込み時に苦手リストの数を表示
+        window.onload = function() { updateWeakCount(); };
+
+        function updateWeakCount() {
+            let weakWords = JSON.parse(localStorage.getItem('weakWords')) || [];
+            document.getElementById('weak-count').innerText = weakWords.length;
+            
+            const reviewBtn = document.getElementById('review-btn');
+            if (weakWords.length === 0) {
+                reviewBtn.style.opacity = "0.5";
+                reviewBtn.disabled = true;
+            } else {
+                reviewBtn.style.opacity = "1";
+                reviewBtn.disabled = false;
+            }
+        }
+
         function updateDelaySetup() {
             delaySeconds = document.getElementById('delay-slider-setup').value;
             document.getElementById('delay-val-setup').innerText = delaySeconds;
         }
 
-        // ホーム画面に戻る
         function goHome() {
             isPlaying = false;
             speechSynthesis.cancel();
+            updateWeakCount();
             document.getElementById('learn-screen').style.display = 'none';
             document.getElementById('setup-screen').style.display = 'block';
         }
 
-        // 学習スタート
         function startLearning() {
+            isReviewMode = false;
             const selectedKey = document.getElementById('list-select').value;
             currentList = wordDatabase[selectedKey];
             currentIndex = 0;
+            launchLearnScreen();
+        }
+
+        function startReviewing() {
+            let weakWords = JSON.parse(localStorage.getItem('weakWords')) || [];
+            if (weakWords.length === 0) return;
             
+            isReviewMode = true;
+            currentList = weakWords;
+            currentIndex = 0;
+            launchLearnScreen();
+        }
+
+        function launchLearnScreen() {
             document.getElementById('setup-screen').style.display = 'none';
             document.getElementById('learn-screen').style.display = 'block';
-            
             isPlaying = true;
             document.getElementById('play-btn').innerText = "■ ストップ";
             document.getElementById('play-btn').style.backgroundColor = "#ef4444";
-            
             playLoop();
         }
 
-        function markAsWeak() {
-            const btn = document.getElementById('weak-btn');
-            btn.innerText = "✓ 登録しました";
-            btn.style.backgroundColor = "#9ca3af";
-            // TODO: ここに苦手リスト保存のロジックを追加可能
+        // 苦手リストへの「追加」と「削除」を管理する関数
+        function handleAction() {
+            const word = currentList[currentIndex];
+            let weakWords = JSON.parse(localStorage.getItem('weakWords')) || [];
+            const actionBtn = document.getElementById('action-btn');
+
+            if (!isReviewMode) {
+                // 通常学習時：苦手リストに追加する
+                const exists = weakWords.some(w => w.fr === word.fr);
+                if (!exists) {
+                    weakWords.push(word);
+                    localStorage.setItem('weakWords', JSON.stringify(weakWords));
+                }
+                actionBtn.innerText = "✓ 登録しました";
+                actionBtn.style.backgroundColor = "#9ca3af";
+            } else {
+                // 復習モード時：苦手リストから削除する（覚えた）
+                weakWords = weakWords.filter(w => w.fr !== word.fr);
+                localStorage.setItem('weakWords', JSON.stringify(weakWords));
+                actionBtn.innerText = "✓ 削除しました";
+                actionBtn.style.backgroundColor = "#9ca3af";
+            }
         }
 
         function speak(text, lang) {
@@ -198,36 +247,39 @@
             const frWordEl = document.getElementById('fr-word');
             const jaWordEl = document.getElementById('ja-word');
             const jaSection = document.getElementById('ja-section');
-            const weakBtn = document.getElementById('weak-btn');
+            const actionBtn = document.getElementById('action-btn');
             const statusBar = document.getElementById('status-bar');
 
-            // ステータス更新
-            statusBar.innerText = `学習中: ${currentIndex + 1} / ${currentList.length} 語`;
+            // モードに応じたステータス表示
+            const modeText = isReviewMode ? "⚠️ 苦手克服中" : "通常学習";
+            statusBar.innerText = `${modeText}: ${currentIndex + 1} / ${currentList.length} 語`;
 
-            // UIリセット：チラ見え防止のため、日本語のテキストを空にしてから隠す
+            // UIリセット
             jaWordEl.innerText = ""; 
             jaSection.classList.remove('show');
-            weakBtn.style.visibility = 'hidden';
-            weakBtn.innerText = "⚠️ 苦手リストに追加";
-            weakBtn.style.backgroundColor = "#f59e0b";
+            actionBtn.style.visibility = 'hidden';
 
-            // 性別カラーの適用
+            // モードによってアクションボタンの見た目と機能を変える
+            if (isReviewMode) {
+                actionBtn.innerText = "✓ 覚えた（リストから外す）";
+                actionBtn.style.backgroundColor = "#3b82f6"; // 青色
+            } else {
+                actionBtn.innerText = "⚠️ 苦手リストに追加";
+                actionBtn.style.backgroundColor = "#f59e0b"; // オレンジ色
+            }
+
             frWordEl.className = `fr-word ${word.gender}`;
             jaWordEl.className = `ja-word ${word.gender}`;
 
-            // フランス語側の表示
             frWordEl.innerText = word.fr;
             document.getElementById('ipa').innerText = word.ipa;
             
-            // 1. 仏語再生
             await speak(word.fr, 'fr-FR');
             if (!isPlaying) return;
 
-            // 2. 待機（スライダー設定秒数）
             await sleep(delaySeconds * 1000);
             if (!isPlaying) return;
 
-            // 3. 待機完了後に、初めて日本語データを入れ込み、画面に表示させる
             jaWordEl.innerText = word.ja;
             document.getElementById('en-word').innerText = word.en;
             document.getElementById('example-fr').innerText = word.ex_fr;
@@ -235,13 +287,11 @@
             document.getElementById('note').innerText = `【レベル: ${word.level}】 ${word.note}`;
             
             jaSection.classList.add('show');
-            weakBtn.style.visibility = 'visible';
+            actionBtn.style.visibility = 'visible'; // ここでボタンを表示
 
-            // 4. 日本語再生
             await speak(word.ja, 'ja-JP');
             if (!isPlaying) return;
 
-            // 次の単語へ進む
             currentIndex = (currentIndex + 1) % currentList.length;
             playLoop(); 
         }

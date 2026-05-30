@@ -151,7 +151,8 @@
         let isPlaying = false;
         let delaySeconds = 0.5;
         let nextDelaySeconds = 0.0;
-        let isReviewMode = false; 
+        let isReviewMode = false;
+        let displayedWord = null; 
 
         window.onload = async function() { 
             updateWeakCount(); 
@@ -348,6 +349,74 @@
             }
         }
 
+
+        function handleWeakAction() {
+            const word = displayedWord;
+            if (!word) return;
+
+            const key = getWordKey(word);
+            let weakWords = getWeakWords();
+            let masterKeys = getMasterWordKeys();
+
+            // 苦手に戻した場合は、マスター扱いを解除する
+            masterKeys = masterKeys.filter(k => k !== key);
+            setMasterWordKeys(masterKeys);
+
+            const exists = weakWords.some(w => getWordKey(w) === key);
+            if (!exists) {
+                weakWords.push(word);
+                setWeakWords(weakWords);
+            }
+
+            const weakBtn = document.getElementById('weak-btn');
+            weakBtn.innerText = '✓ 苦手に追加済み';
+            weakBtn.style.backgroundColor = '#9ca3af';
+
+            updateWeakCount();
+            updateMasterCount();
+        }
+
+        function handleMasterAction() {
+            const word = displayedWord;
+            if (!word) return;
+
+            const key = getWordKey(word);
+            let masterKeys = getMasterWordKeys();
+            let weakWords = getWeakWords();
+
+            if (!masterKeys.includes(key)) {
+                masterKeys.push(key);
+                setMasterWordKeys(masterKeys);
+            }
+
+            // マスターした単語は苦手リストからも外す
+            weakWords = weakWords.filter(w => getWordKey(w) !== key);
+            setWeakWords(weakWords);
+
+            const masterBtn = document.getElementById('master-btn');
+            masterBtn.innerText = '✓ マスター済み';
+            masterBtn.style.backgroundColor = '#9ca3af';
+
+            updateWeakCount();
+            updateMasterCount();
+        }
+
+        function handleReviewAction() {
+            const word = displayedWord;
+            if (!word) return;
+
+            const key = getWordKey(word);
+            let weakWords = getWeakWords();
+            weakWords = weakWords.filter(w => getWordKey(w) !== key);
+            setWeakWords(weakWords);
+
+            const reviewActionBtn = document.getElementById('review-action-btn');
+            reviewActionBtn.innerText = '✓ 苦手リストから削除済み';
+            reviewActionBtn.style.backgroundColor = '#9ca3af';
+
+            updateWeakCount();
+        }
+
         function speak(text, lang) {
             return new Promise(resolve => {
                 const utterance = new SpeechSynthesisUtterance(text);
@@ -366,6 +435,7 @@
             if (!isPlaying || currentList.length === 0) return;
 
             const word = currentList[currentIndex];
+            displayedWord = word;
             const frWordEl = document.getElementById('fr-word');
             const jaWordEl = document.getElementById('ja-word');
             const jaSection = document.getElementById('ja-section');

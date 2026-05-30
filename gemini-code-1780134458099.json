@@ -1,0 +1,16 @@
+{
+  "name": "フランス語学習アプリ",
+  "short_name": "Fr Vocab",
+  "description": "オートプレイ対応のフランス語単語帳",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

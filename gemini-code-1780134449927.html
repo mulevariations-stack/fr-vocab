@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- PWA for iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Fr Vocab">
+    <link rel="apple-touch-icon" href="icon.png"> <!-- 192x192のアイコン画像を用意してください -->
+    <link rel="manifest" href="manifest.json">
+    <title>フランス語学習アプリ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff; /* 背景色は白 */
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            color: #333;
+        }
+        .flashcard {
+            width: 100%; max-width: 400px;
+            text-align: center; margin-top: 2vh;
+            min-height: 60vh;
+        }
+        /* 性別による色分けのクラス */
+        .male { color: #0052cc; } /* 青 */
+        .female { color: #e11d48; } /* 赤 */
+        .neutral { color: #333333; } /* 黒 */
+
+        .fr-section { margin-bottom: 30px; }
+        .fr-word { font-size: 2.8em; font-weight: bold; margin-bottom: 5px; }
+        .ipa { font-size: 1.2em; color: #666; }
+
+        .ja-section { 
+            opacity: 0; /* 初期状態は隠す */
+            transition: opacity 0.2s ease; 
+            border-top: 1px solid #eee; padding-top: 20px;
+        }
+        .ja-section.show { opacity: 1; }
+        
+        .ja-word { font-size: 1.8em; font-weight: bold; margin-bottom: 5px; }
+        .en-word { font-size: 1.2em; color: #666; margin-bottom: 20px; font-style: italic; }
+        .example-fr { font-size: 1.2em; margin-bottom: 5px; }
+        .example-ja { font-size: 1em; color: #555; margin-bottom: 20px; }
+        .note { font-size: 0.9em; background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: left; }
+
+        .controls { width: 100%; max-width: 400px; margin-top: 20px; text-align: center; }
+        .btn {
+            padding: 15px 30px; font-size: 1.2em; font-weight: bold;
+            border: none; border-radius: 25px; cursor: pointer; width: 100%; margin-bottom: 10px;
+        }
+        .btn-play { background-color: #10b981; color: white; }
+        .btn-weak { background-color: #f59e0b; color: white; display: none; } /* 再生中のみ表示 */
+        
+        .slider-container { margin-top: 15px; font-size: 0.9em; color: #666; }
+        input[type="range"] { width: 80%; }
+    </style>
+</head>
+<body>
+
+    <div class="flashcard">
+        <div class="fr-section">
+            <div id="fr-word" class="fr-word neutral">準備完了</div>
+            <div id="ipa" class="ipa"></div>
+        </div>
+
+        <div id="ja-section" class="ja-section">
+            <div id="ja-word" class="ja-word neutral">スタートを押してください</div>
+            <div id="en-word" class="en-word"></div>
+            <div id="example-fr" class="example-fr"></div>
+            <div id="example-ja" class="example-ja"></div>
+            <div id="note" class="note"></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="weak-btn" class="btn btn-weak" onclick="markAsWeak()">⚠️ 苦手リストに追加</button>
+        <button id="play-btn" class="btn btn-play" onclick="togglePlay()">▶ 学習スタート</button>
+        
+        <div class="slider-container">
+            待機時間: <span id="delay-val">0.5</span>秒<br>
+            <input type="range" id="delay-slider" min="0" max="1" step="0.1" value="0.5" oninput="updateDelay()">
+        </div>
+    </div>
+
+    <script>
+        // 単語リスト（テーマ：日常生活・移動）
+        const words = [
+            { id: 1, fr: "une commune", ipa: "[kɔmyn]", ja: "自治体・区役所", en: "municipality", level: "A2", ex_fr: "Je vais à la commune.", ex_ja: "区役所に行きます。", note: "生活手続きで頻出。", gender: "female" },
+            { id: 2, fr: "un tram", ipa: "[tʁam]", ja: "トラム・路面電車", en: "tram", level: "A1", ex_fr: "Je prends le tram 39.", ex_ja: "39番のトラムに乗ります。", note: "英語と同じ綴り。", gender: "male" },
+            { id: 3, fr: "un parc", ipa: "[paʁk]", ja: "公園", en: "park", level: "A1", ex_fr: "Le parc est grand.", ex_ja: "その公園は大きいです。", note: "緑豊かな場所を示す。", gender: "male" },
+            { id: 4, fr: "être", ipa: "[ɛtʁ]", ja: "〜である", en: "be", level: "A1", ex_fr: "Je suis prêt.", ex_ja: "準備できています。", note: "最も基本的な動詞。", gender: "neutral" }
+        ];
+
+        let currentIndex = 0;
+        let isPlaying = false;
+        let delaySeconds = 0.5;
+        let currentUtterance = null; // 現在の音声を保持
+
+        // Service Workerの登録（オフライン対応）
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+
+        function updateDelay() {
+            delaySeconds = document.getElementById('delay-slider').value;
+            document.getElementById('delay-val').innerText = delaySeconds;
+        }
+
+        function markAsWeak() {
+            // 実際のアプリではここで localStorage等にIDを保存します
+            const btn = document.getElementById('weak-btn');
+            btn.innerText = "✓ 登録しました";
+            btn.style.backgroundColor = "#9ca3af";
+        }
+
+        function speak(text, lang) {
+            return new Promise(resolve => {
+                currentUtterance = new SpeechSynthesisUtterance(text);
+                currentUtterance.lang = lang;
+                // iOSでの読み上げ速度調整（少し遅めの方が聞き取りやすい）
+                currentUtterance.rate = lang === 'fr-FR' ? 0.8 : 1.0; 
+                currentUtterance.onend = resolve;
+                speechSynthesis.speak(currentUtterance);
+            });
+        }
+
+        // 待機用の関数
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function playLoop() {
+            if (!isPlaying) return;
+
+            const word = words[currentIndex];
+            const frWordEl = document.getElementById('fr-word');
+            const jaWordEl = document.getElementById('ja-word');
+            const jaSection = document.getElementById('ja-section');
+            const weakBtn = document.getElementById('weak-btn');
+
+            // UIリセット＆ボタンをデフォルトに戻す
+            jaSection.classList.remove('show');
+            weakBtn.style.display = 'none';
+            weakBtn.innerText = "⚠️ 苦手リストに追加";
+            weakBtn.style.backgroundColor = "#f59e0b";
+
+            // 性別カラーの適用
+            frWordEl.className = `fr-word ${word.gender}`;
+            jaWordEl.className = `ja-word ${word.gender}`;
+
+            // フランス語側の表示
+            frWordEl.innerText = word.fr;
+            document.getElementById('ipa').innerText = word.ipa;
+            
+            // 裏面（日本語側）のデータセット
+            jaWordEl.innerText = word.ja;
+            document.getElementById('en-word').innerText = word.en;
+            document.getElementById('example-fr').innerText = word.ex_fr;
+            document.getElementById('example-ja').innerText = word.ex_ja;
+            document.getElementById('note').innerText = `【レベル: ${word.level}】 ${word.note}`;
+
+            // 1. 仏語再生
+            await speak(word.fr, 'fr-FR');
+            if (!isPlaying) return;
+
+            // 2. 待機（スライダーで設定した秒数）
+            await sleep(delaySeconds * 1000);
+            if (!isPlaying) return;
+
+            // 3. 日本語表示と同時に「苦手ボタン」表示、日本語再生
+            jaSection.classList.add('show');
+            weakBtn.style.display = 'block';
+            await speak(word.ja, 'ja-JP');
+            if (!isPlaying) return;
+
+            // 次の単語へ進むループ
+            currentIndex = (currentIndex + 1) % words.length;
+            playLoop(); 
+        }
+
+        function togglePlay() {
+            const btn = document.getElementById('play-btn');
+            if (isPlaying) {
+                isPlaying = false;
+                speechSynthesis.cancel(); // 再生中の音声を強制停止
+                btn.innerText = "▶ 学習スタート";
+                btn.style.backgroundColor = "#10b981";
+                document.getElementById('weak-btn').style.display = 'none';
+            } else {
+                isPlaying = true;
+                btn.innerText = "■ ストップ";
+                btn.style.backgroundColor = "#ef4444";
+                playLoop();
+            }
+        }
+    </script>
+</body>
+</html>

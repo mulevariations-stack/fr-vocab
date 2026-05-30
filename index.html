@@ -36,12 +36,20 @@
             visibility: hidden; opacity: 0; 
             transition: opacity 0.2s ease; 
             border-top: 1px solid #eee; padding-top: 20px;
-            min-height: 200px;
+            min-height: 250px;
         }
         .ja-section.show { visibility: visible; opacity: 1; }
         
         .ja-word { font-size: 1.8em; font-weight: bold; margin-bottom: 5px; }
-        .en-word { font-size: 1.2em; color: #666; margin-bottom: 20px; font-style: italic; }
+        .en-word { font-size: 1.2em; color: #666; margin-bottom: 15px; font-style: italic; }
+        
+        /* 類義語ボックスのデザイン */
+        .synonyms-box { 
+            background: #eef2ff; color: #3730a3; padding: 8px 12px; 
+            border-radius: 6px; font-size: 1em; font-weight: bold; 
+            margin-bottom: 15px; text-align: center;
+        }
+        
         .example-fr { font-size: 1.2em; margin-bottom: 5px; }
         .example-ja { font-size: 1em; color: #555; margin-bottom: 20px; }
         .note { font-size: 0.9em; background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: left; }
@@ -53,7 +61,7 @@
         }
         .btn-start { background-color: #3b82f6; color: white; margin-top: 20px; }
         .btn-play { background-color: #10b981; color: white; }
-        .btn-action { color: white; visibility: hidden; } /* 文字色を白に修正済 */
+        .btn-action { color: white; visibility: hidden; } 
         .btn-home { background-color: #6b7280; color: white; margin-top: 20px; font-size: 1em; padding: 10px; }
         .btn-review { background-color: #8b5cf6; color: white; margin-top: 10px; }
         
@@ -61,39 +69,41 @@
         input[type="range"] { width: 80%; }
         
         .status-bar { font-size: 0.9em; color: #888; margin-bottom: 15px; }
-
         .weak-dashboard { margin-top: 40px; padding-top: 20px; border-top: 2px dashed #eee; text-align: center; }
+        
+        /* ローディング画面 */
+        #loading-msg { color: #f59e0b; font-weight: bold; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
     <div id="setup-screen">
-        <h1>📚 単語リストを選択</h1>
+        <h1>📚 フランス語 語彙マスター</h1>
         
-        <label for="list-select" style="font-weight:bold; color:#555;">カテゴリー（レベル別）</label>
-        <select id="list-select" class="select-box">
-            <option value="A1_verbs">A1 基礎・最重要動詞 (5語)</option>
-            <option value="A1_nouns_people">A1 人・家族に関する名詞 (5語)</option>
-            <option value="A2_mobility_business">A2 モビリティ・ビジネス (5語)</option>
-        </select>
+        <div id="loading-msg">⏳ 単語データを読み込み中...</div>
+        
+        <div id="menu-content" style="display: none;">
+            <label for="list-select" style="font-weight:bold; color:#555;">カテゴリーを選択</label>
+            <select id="list-select" class="select-box"></select>
 
-        <div class="slider-container" style="text-align: center;">
-            <label style="font-weight:bold; color:#555;">日本語表示までの待機時間</label><br>
-            <span id="delay-val-setup" style="font-size:1.5em; font-weight:bold; color:#3b82f6;">0.5</span> 秒<br>
-            <input type="range" id="delay-slider-setup" min="0" max="2" step="0.1" value="0.5" oninput="updateDelaySetup()">
-        </div>
+            <div class="slider-container" style="text-align: center;">
+                <label style="font-weight:bold; color:#555;">日本語表示までの待機時間</label><br>
+                <span id="delay-val-setup" style="font-size:1.5em; font-weight:bold; color:#3b82f6;">0.5</span> 秒<br>
+                <input type="range" id="delay-slider-setup" min="0" max="2" step="0.1" value="0.5" oninput="updateDelaySetup()">
+            </div>
 
-        <div class="slider-container" style="text-align: center; margin-top: 20px;">
-            <label style="font-weight:bold; color:#555;">次の単語に進むまでの待機時間</label><br>
-            <span id="next-delay-val-setup" style="font-size:1.5em; font-weight:bold; color:#10b981;">0.0</span> 秒<br>
-            <input type="range" id="next-delay-slider-setup" min="0" max="2" step="0.1" value="0.0" oninput="updateNextDelaySetup()">
-        </div>
+            <div class="slider-container" style="text-align: center; margin-top: 20px;">
+                <label style="font-weight:bold; color:#555;">次の単語に進むまでの待機時間</label><br>
+                <span id="next-delay-val-setup" style="font-size:1.5em; font-weight:bold; color:#10b981;">0.0</span> 秒<br>
+                <input type="range" id="next-delay-slider-setup" min="0" max="2" step="0.1" value="0.0" oninput="updateNextDelaySetup()">
+            </div>
 
-        <button class="btn btn-start" onclick="startLearning()">学習を開始する</button>
+            <button class="btn btn-start" onclick="startLearning()">学習を開始する</button>
 
-        <div class="weak-dashboard">
-            <p style="font-weight:bold; color:#555; margin-bottom: 5px;">⚠️ 苦手リスト: <span id="weak-count" style="font-size:1.5em; color:#f59e0b;">0</span> 語</p>
-            <button id="review-btn" class="btn btn-review" onclick="startReviewing()">苦手リストを復習する</button>
+            <div class="weak-dashboard">
+                <p style="font-weight:bold; color:#555; margin-bottom: 5px;">⚠️ 苦手リスト: <span id="weak-count" style="font-size:1.5em; color:#f59e0b;">0</span> 語</p>
+                <button id="review-btn" class="btn btn-review" onclick="startReviewing()">苦手リストを復習する</button>
+            </div>
         </div>
     </div>
 
@@ -108,6 +118,11 @@
         <div id="ja-section" class="ja-section">
             <div id="ja-word" class="ja-word neutral"></div>
             <div id="en-word" class="en-word"></div>
+            
+            <div id="synonyms-container" class="synonyms-box" style="display: none;">
+                💡 類義語：<span id="synonyms-text"></span>
+            </div>
+            
             <div id="example-fr" class="example-fr"></div>
             <div id="example-ja" class="example-ja"></div>
             <div id="note" class="note"></div>
@@ -121,30 +136,7 @@
     </div>
 
     <script>
-        const wordDatabase = {
-            "A1_verbs": [
-                { fr: "être", ipa: "[ɛtʁ]", ja: "〜である・いる", en: "be", level: "A1", ex_fr: "Je suis là.", ex_ja: "私はここにいる。", note: "英語のbe動詞に相当する超基本動詞。", gender: "neutral" },
-                { fr: "avoir", ipa: "[avwaʁ]", ja: "持つ・ある", en: "have", level: "A1", ex_fr: "Il a un livre.", ex_ja: "彼は本を持っている。", note: "英語のhaveに相当する。", gender: "neutral" },
-                { fr: "aller", ipa: "[ale]", ja: "行く", en: "go", level: "A1", ex_fr: "Je vais au cinéma.", ex_ja: "映画館に行く。", note: "不規則変化する最重要動詞の一つ。", gender: "neutral" },
-                { fr: "faire", ipa: "[fɛʁ]", ja: "する・作る", en: "make/do", level: "A1", ex_fr: "Je fais mes devoirs.", ex_ja: "宿題をする。", note: "英語のdo/makeの両方に相当。", gender: "neutral" },
-                { fr: "dire", ipa: "[diʁ]", ja: "言う", en: "say/tell", level: "A1", ex_fr: "Il dit la vérité.", ex_ja: "彼は真実を言う。", note: "英語のsayと同等に頻出。", gender: "neutral" }
-            ],
-            "A1_nouns_people": [
-                { fr: "un homme", ipa: "[ɔm]", ja: "男・人間", en: "man", level: "A1", ex_fr: "C'est un homme bon.", ex_ja: "彼は良い男だ。", note: "英語のhumanと同語源。", gender: "male" },
-                { fr: "une femme", ipa: "[fam]", ja: "女・妻", en: "woman/wife", level: "A1", ex_fr: "Elle est une femme forte.", ex_ja: "彼女は強い女性だ。", note: "英語のfemaleと同語源。", gender: "female" },
-                { fr: "un enfant", ipa: "[ɑ̃fɑ̃]", ja: "子供", en: "child", level: "A1", ex_fr: "L'enfant joue.", ex_ja: "子供が遊ぶ。", note: "英語のinfantと同語源。", gender: "male" },
-                { fr: "un père", ipa: "[pɛʁ]", ja: "父", en: "father", level: "A1", ex_fr: "Mon père est médecin.", ex_ja: "私の父は医者です。", note: "英語のpaternalと同語源。", gender: "male" },
-                { fr: "une mère", ipa: "[mɛʁ]", ja: "母", en: "mother", level: "A1", ex_fr: "Sa mère est gentille.", ex_ja: "彼の母は優しい。", note: "英語のmaternalと同語源。", gender: "female" }
-            ],
-            "A2_mobility_business": [
-                { fr: "un véhicule", ipa: "[veikyl]", ja: "車両・乗り物", en: "vehicle", level: "A2", ex_fr: "Ce véhicule est électrique.", ex_ja: "この車両は電気自動車です。", note: "英語の vehicle と同語源。hは発音しない。", gender: "male" },
-                { fr: "électrique", ipa: "[elɛktʁik]", ja: "電気の", en: "electric", level: "A2", ex_fr: "Le marché des voitures électriques.", ex_ja: "電気自動車の市場。", note: "モビリティ業界で必須の形容詞。", gender: "neutral" },
-                { fr: "un contrat", ipa: "[kɔ̃tʁa]", ja: "契約", en: "contract", level: "A2", ex_fr: "Nous avons signé un contrat.", ex_ja: "私たちは契約に署名した。", note: "ビジネスで頻出。tは発音しない。", gender: "male" },
-                { fr: "un projet", ipa: "[pʁɔʒɛ]", ja: "プロジェクト", en: "project", level: "A2", ex_fr: "Le projet commence demain.", ex_ja: "プロジェクトは明日始まる。", note: "英語の project と同語源。", gender: "male" },
-                { fr: "une rentabilité", ipa: "[ʁɑ̃tabilite]", ja: "収益性", en: "profitability", level: "B1", ex_fr: "On doit améliorer la rentabilité.", ex_ja: "収益性を向上させる必要がある。", note: "英語の rent (賃貸)と同根。利益・収益管理の重要語。", gender: "female" }
-            ]
-        };
-
+        let wordDatabase = {}; // CSVから自動生成されるデータベース
         let currentList = [];
         let currentIndex = 0;
         let isPlaying = false;
@@ -152,12 +144,91 @@
         let nextDelaySeconds = 0.0;
         let isReviewMode = false; 
 
-        window.onload = function() { updateWeakCount(); };
+        window.onload = async function() { 
+            updateWeakCount(); 
+            await loadCSVData();
+        };
+
+        // CSVデータをフェッチして解析する
+        async function loadCSVData() {
+            try {
+                // キャッシュ回避のためクエリパラメータを付与
+                const response = await fetch('words.csv?v=' + new Date().getTime());
+                if (!response.ok) throw new Error("CSV not found");
+                const csvText = await response.text();
+                parseCSVToDatabase(csvText);
+            } catch (error) {
+                document.getElementById('loading-msg').innerText = "エラー: words.csv が見つかりません。GitHubにアップロードしてください。";
+            }
+        }
+
+        // CSV文字列をパースして wordDatabase に変換
+        function parseCSVToDatabase(csvText) {
+            const rows = parseCSVLine(csvText);
+            if (rows.length < 2) return;
+            
+            const headers = rows[0].map(h => h.trim());
+            
+            for (let i = 1; i < rows.length; i++) {
+                if (rows[i].length !== headers.length) continue;
+                
+                let wordObj = {};
+                for (let j = 0; j < headers.length; j++) {
+                    wordObj[headers[j]] = rows[i][j].trim();
+                }
+                
+                const cat = wordObj.category;
+                if (!cat) continue;
+                
+                if (!wordDatabase[cat]) {
+                    wordDatabase[cat] = {
+                        name: wordObj.category_name || cat,
+                        words: []
+                    };
+                }
+                wordDatabase[cat].words.push(wordObj);
+            }
+            
+            buildSelectMenu();
+        }
+
+        // 堅牢なCSVパーサー（カンマや改行への対応）
+        function parseCSVLine(str) {
+            const arr = [];
+            let quote = false;
+            let col = 0, row = 0;
+            for (let c = 0; c < str.length; c++) {
+                let cc = str[c], nc = str[c+1];
+                arr[row] = arr[row] || [];
+                arr[row][col] = arr[row][col] || '';
+                if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
+                if (cc == '"') { quote = !quote; continue; }
+                if (cc == ',' && !quote) { ++col; continue; }
+                if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
+                if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+                if (cc == '\r' && !quote) { ++row; col = 0; continue; }
+                arr[row][col] += cc;
+            }
+            return arr;
+        }
+
+        // セレクトメニューの動的生成
+        function buildSelectMenu() {
+            const selectEl = document.getElementById('list-select');
+            selectEl.innerHTML = "";
+            for (const key in wordDatabase) {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.innerText = `${wordDatabase[key].name} (${wordDatabase[key].words.length}語)`;
+                selectEl.appendChild(opt);
+            }
+            document.getElementById('loading-msg').style.display = 'none';
+            document.getElementById('menu-content').style.display = 'block';
+        }
 
         function updateWeakCount() {
             let weakWords = JSON.parse(localStorage.getItem('weakWords')) || [];
             document.getElementById('weak-count').innerText = weakWords.length;
-            
             const reviewBtn = document.getElementById('review-btn');
             if (weakWords.length === 0) {
                 reviewBtn.style.opacity = "0.5";
@@ -189,7 +260,7 @@
         function startLearning() {
             isReviewMode = false;
             const selectedKey = document.getElementById('list-select').value;
-            currentList = wordDatabase[selectedKey];
+            currentList = wordDatabase[selectedKey].words;
             currentIndex = 0;
             launchLearnScreen();
         }
@@ -197,7 +268,6 @@
         function startReviewing() {
             let weakWords = JSON.parse(localStorage.getItem('weakWords')) || [];
             if (weakWords.length === 0) return;
-            
             isReviewMode = true;
             currentList = weakWords;
             currentIndex = 0;
@@ -257,6 +327,7 @@
             const jaSection = document.getElementById('ja-section');
             const actionBtn = document.getElementById('action-btn');
             const statusBar = document.getElementById('status-bar');
+            const synContainer = document.getElementById('synonyms-container');
 
             const modeText = isReviewMode ? "⚠️ 苦手克服中" : "通常学習";
             statusBar.innerText = `${modeText}: ${currentIndex + 1} / ${currentList.length} 語`;
@@ -264,6 +335,7 @@
             jaWordEl.innerText = ""; 
             jaSection.classList.remove('show');
             actionBtn.style.visibility = 'hidden';
+            synContainer.style.display = 'none'; // リセット時は類義語を隠す
 
             if (isReviewMode) {
                 actionBtn.innerText = "✓ 覚えた（リストから外す）";
@@ -287,6 +359,13 @@
 
             jaWordEl.innerText = word.ja;
             document.getElementById('en-word').innerText = word.en;
+            
+            // 類義語データがある場合のみ、青いボックスを表示する
+            if (word.synonyms && word.synonyms.trim() !== "") {
+                document.getElementById('synonyms-text').innerText = word.synonyms;
+                synContainer.style.display = 'block';
+            }
+
             document.getElementById('example-fr').innerText = word.ex_fr;
             document.getElementById('example-ja').innerText = word.ex_ja;
             document.getElementById('note').innerText = `【レベル: ${word.level}】 ${word.note}`;

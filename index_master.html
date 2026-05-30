@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Fr Vocab">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="manifest" href="manifest.json">
+    <title>フランス語学習アプリ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            color: #333;
+        }
+        
+        #setup-screen, #learn-screen { width: 100%; max-width: 400px; }
+        #learn-screen { display: none; text-align: center; margin-top: 2vh; }
+
+        h1 { font-size: 1.5em; color: #2c3e50; text-align: center; margin-bottom: 30px; }
+        .select-box { width: 100%; padding: 15px; font-size: 1.1em; border-radius: 10px; border: 1px solid #ccc; margin-bottom: 20px; }
+        
+        .male { color: #0052cc; } 
+        .female { color: #e11d48; } 
+        .neutral { color: #333333; } 
+
+        .fr-section { margin-bottom: 30px; min-height: 120px; }
+        .fr-word { font-size: 2.8em; font-weight: bold; margin-bottom: 5px; }
+        .ipa { font-size: 1.2em; color: #666; }
+
+        .ja-section { 
+            visibility: hidden; opacity: 0; 
+            transition: opacity 0.2s ease; 
+            border-top: 1px solid #eee; padding-top: 20px;
+            min-height: 250px;
+        }
+        .ja-section.show { visibility: visible; opacity: 1; }
+        
+        .ja-word { font-size: 1.8em; font-weight: bold; margin-bottom: 5px; }
+        .en-word { font-size: 1.2em; color: #666; margin-bottom: 15px; font-style: italic; }
+        
+        /* 類義語ボックスのデザイン */
+        .synonyms-box { 
+            background: #eef2ff; color: #3730a3; padding: 8px 12px; 
+            border-radius: 6px; font-size: 1em; font-weight: bold; 
+            margin-bottom: 15px; text-align: center;
+        }
+        
+        .example-fr { font-size: 1.2em; margin-bottom: 5px; }
+        .example-ja { font-size: 1em; color: #555; margin-bottom: 20px; }
+        .note { font-size: 0.9em; background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: left; }
+
+        .controls { width: 100%; max-width: 400px; margin-top: 20px; text-align: center; }
+        .btn {
+            padding: 15px 30px; font-size: 1.2em; font-weight: bold;
+            border: none; border-radius: 25px; cursor: pointer; width: 100%; margin-bottom: 10px;
+        }
+        .btn-start { background-color: #3b82f6; color: white; margin-top: 20px; }
+        .btn-play { background-color: #10b981; color: white; }
+        .btn-action { color: white; visibility: hidden; }
+        .btn-row { display: flex; gap: 10px; }
+        .btn-row .btn { flex: 1; padding: 15px 10px; font-size: 1em; }
+        .btn-weak { background-color: #f59e0b; }
+        .btn-master { background-color: #facc15; color: #78350f; }
+        .btn-home { background-color: #6b7280; color: white; margin-top: 20px; font-size: 1em; padding: 10px; }
+        .btn-review { background-color: #8b5cf6; color: white; margin-top: 10px; }
+        
+        .slider-container { margin-top: 15px; font-size: 0.9em; color: #666; }
+        input[type="range"] { width: 80%; }
+        
+        .status-bar { font-size: 0.9em; color: #888; margin-bottom: 15px; }
+        .weak-dashboard { margin-top: 40px; padding-top: 20px; border-top: 2px dashed #eee; text-align: center; }
+        
+        /* ローディング画面 */
+        #loading-msg { color: #f59e0b; font-weight: bold; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen">
+        <h1>📚 フランス語 語彙マスター</h1>
+        
+        <div id="loading-msg">⏳ 単語データを読み込み中...</div>
+        
+        <div id="menu-content" style="display: none;">
+            <label for="list-select" style="font-weight:bold; color:#555;">カテゴリーを選択</label>
+            <select id="list-select" class="select-box"></select>
+
+            <div class="slider-container" style="text-align: center;">
+                <label style="font-weight:bold; color:#555;">日本語表示までの待機時間</label><br>
+                <span id="delay-val-setup" style="font-size:1.5em; font-weight:bold; color:#3b82f6;">0.5</span> 秒<br>
+                <input type="range" id="delay-slider-setup" min="0" max="2" step="0.1" value="0.5" oninput="updateDelaySetup()">
+            </div>
+
+            <div class="slider-container" style="text-align: center; margin-top: 20px;">
+                <label style="font-weight:bold; color:#555;">次の単語に進むまでの待機時間</label><br>
+                <span id="next-delay-val-setup" style="font-size:1.5em; font-weight:bold; color:#10b981;">0.0</span> 秒<br>
+                <input type="range" id="next-delay-slider-setup" min="0" max="2" step="0.1" value="0.0" oninput="updateNextDelaySetup()">
+            </div>
+
+            <button class="btn btn-start" onclick="startLearning()">学習を開始する</button>
+
+            <div class="weak-dashboard">
+                <p style="font-weight:bold; color:#555; margin-bottom: 5px;">⚠️ 苦手リスト: <span id="weak-count" style="font-size:1.5em; color:#f59e0b;">0</span> 語</p>
+                <button id="review-btn" class="btn btn-review" onclick="startReviewing()">苦手リストを復習する</button>
+                <p style="font-weight:bold; color:#555; margin-top: 20px; margin-bottom: 5px;">★ マスター: <span id="master-count" style="font-size:1.5em; color:#ca8a04;">0</span> 語</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="learn-screen">
+        <div class="status-bar" id="status-bar"></div>
+        
+        <div class="fr-section">
+            <div id="fr-word" class="fr-word neutral"></div>
+            <div id="ipa" class="ipa"></div>
+        </div>
+
+        <div id="ja-section" class="ja-section">
+            <div id="ja-word" class="ja-word neutral"></div>
+            <div id="en-word" class="en-word"></div>
+            
+            <div id="synonyms-container" class="synonyms-box" style="display: none;">
+                💡 類義語：<span id="synonyms-text"></span>
+            </div>
+            
+            <div id="example-fr" class="example-fr"></div>
+            <div id="example-ja" class="example-ja"></div>
+            <div id="note" class="note"></div>
+        </div>
+
+        <div class="controls">
+            <div id="normal-action-row" class="btn-row" style="display: none;">
+                <button id="weak-btn" class="btn btn-action btn-weak" onclick="handleWeakAction()">⚠️ 苦手へ</button>
+                <button id="master-btn" class="btn btn-action btn-master" onclick="handleMasterAction()">★ マスター</button>
+            </div>
+            <button id="review-action-btn" class="btn btn-action" onclick="handleReviewAction()">✓ 覚えた（リストから外す）</button>
+            <button id="play-btn" class="btn btn-play" onclick="togglePlay()">■ ストップ</button>
+            <button class="btn btn-home" onclick="goHome()">🏠 メニューに戻る</button>
+        </div>
+    </div>
+
+    <script>
+        let wordDatabase = {}; // CSVから自動生成されるデータベース
+        let currentList = [];
+        let currentIndex = 0;
+        let isPlaying = false;
+        let delaySeconds = 0.5;
+        let nextDelaySeconds = 0.0;
+        let isReviewMode = false; 
+
+        window.onload = async function() { 
+            updateWeakCount(); 
+            updateMasterCount();
+            await loadCSVData();
+        };
+
+        // CSVデータをフェッチして解析する
+        async function loadCSVData() {
+            try {
+                // キャッシュ回避のためクエリパラメータを付与
+                const response = await fetch('words.csv?v=' + new Date().getTime());
+                if (!response.ok) throw new Error("CSV not found");
+                const csvText = await response.text();
+                parseCSVToDatabase(csvText);
+            } catch (error) {
+                document.getElementById('loading-msg').innerText = "エラー: words.csv が見つかりません。GitHubにアップロードしてください。";
+            }
+        }
+
+        // CSV文字列をパースして wordDatabase に変換
+        function parseCSVToDatabase(csvText) {
+            const rows = parseCSVLine(csvText);
+            if (rows.length < 2) return;
+            
+            const headers = rows[0].map(h => h.trim());
+            
+            for (let i = 1; i < rows.length; i++) {
+                if (rows[i].length !== headers.length) continue;
+                
+                let wordObj = {};
+                for (let j = 0; j < headers.length; j++) {
+                    wordObj[headers[j]] = rows[i][j].trim();
+                }
+                
+                const cat = wordObj.category;
+                if (!cat) continue;
+                
+                if (!wordDatabase[cat]) {
+                    wordDatabase[cat] = {
+                        name: wordObj.category_name || cat,
+                        words: []
+                    };
+                }
+                wordDatabase[cat].words.push(wordObj);
+            }
+            
+            buildSelectMenu();
+        }
+
+        // 堅牢なCSVパーサー（カンマや改行への対応）
+        function parseCSVLine(str) {
+            const arr = [];
+            let quote = false;
+            let col = 0, row = 0;
+            for (let c = 0; c < str.length; c++) {
+                let cc = str[c], nc = str[c+1];
+                arr[row] = arr[row] || [];
+                arr[row][col] = arr[row][col] || '';
+                if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
+                if (cc == '"') { quote = !quote; continue; }
+                if (cc == ',' && !quote) { ++col; continue; }
+                if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
+                if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+                if (cc == '\r' && !quote) { ++row; col = 0; continue; }
+                arr[row][col] += cc;
+            }
+            return arr;
+        }
+
+        // セレクトメニューの動的生成
+        function buildSelectMenu() {
+            const selectEl = document.getElementById('list-select');
+            selectEl.innerHTML = "";
+            for (const key in wordDatabase) {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.innerText = `${wordDatabase[key].name} (${wordDatabase[key].words.length}語)`;
+                selectEl.appendChild(opt);
+            }
+            document.getElementById('loading-msg').style.display = 'none';
+            document.getElementById('menu-content').style.display = 'block';
+        }
+
+        function getWordKey(word) {
+            // 同じ単語が別カテゴリーに入っても区別できるようにする
+            return `${word.category}::${word.fr}`;
+        }
+
+        function getWeakWords() {
+            return JSON.parse(localStorage.getItem('weakWords')) || [];
+        }
+
+        function setWeakWords(words) {
+            localStorage.setItem('weakWords', JSON.stringify(words));
+        }
+
+        function getMasterWordKeys() {
+            return JSON.parse(localStorage.getItem('masterWordKeys')) || [];
+        }
+
+        function setMasterWordKeys(keys) {
+            localStorage.setItem('masterWordKeys', JSON.stringify(keys));
+        }
+
+        function isMastered(word) {
+            return getMasterWordKeys().includes(getWordKey(word));
+        }
+
+        function updateWeakCount() {
+            let weakWords = getWeakWords();
+            document.getElementById('weak-count').innerText = weakWords.length;
+            const reviewBtn = document.getElementById('review-btn');
+            if (weakWords.length === 0) {
+                reviewBtn.style.opacity = "0.5";
+                reviewBtn.disabled = true;
+            } else {
+                reviewBtn.style.opacity = "1";
+                reviewBtn.disabled = false;
+            }
+        }
+
+        function updateMasterCount() {
+            document.getElementById('master-count').innerText = getMasterWordKeys().length;
+        }
+
+        function updateDelaySetup() {
+            delaySeconds = document.getElementById('delay-slider-setup').value;
+            document.getElementById('delay-val-setup').innerText = delaySeconds;
+        }
+
+        function updateNextDelaySetup() {
+            nextDelaySeconds = document.getElementById('next-delay-slider-setup').value;
+            document.getElementById('next-delay-val-setup').innerText = nextDelaySeconds;
+        }
+
+        function goHome() {
+            isPlaying = false;
+            speechSynthesis.cancel();
+            updateWeakCount();
+            updateMasterCount();
+            document.getElementById('learn-screen').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'block';
+        }
+
+        function startLearning() {
+            isReviewMode = false;
+            const selectedKey = document.getElementById('list-select').value;
+            currentList = wordDatabase[selectedKey].words.filter(word => !isMastered(word));
+            currentIndex = 0;
+            if (currentList.length === 0) {
+                alert('このカテゴリーの単語はすべてマスター済みです。');
+                return;
+            }
+            launchLearnScreen();
+        }
+
+        function startReviewing() {
+            let weakWords = getWeakWords();
+            if (weakWords.length === 0) return;
+            isReviewMode = true;
+            currentList = weakWords;
+            currentIndex = 0;
+            launchLearnScreen();
+        }
+
+        function launchLearnScreen() {
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('learn-screen').style.display = 'block';
+            isPlaying = true;
+            document.getElementById('play-btn').innerText = "■ ストップ";
+            document.getElementById('play-btn').style.backgroundColor = "#ef4444";
+            playLoop();
+        }
+
+        function handleAction() {
+            const word = currentList[currentIndex];
+            let weakWords = getWeakWords();
+            const actionBtn = document.getElementById('action-btn');
+
+            if (!isReviewMode) {
+                const exists = weakWords.some(w => w.fr === word.fr);
+                if (!exists) {
+                    weakWords.push(word);
+                    localStorage.setItem('weakWords', JSON.stringify(weakWords));
+                }
+                actionBtn.innerText = "✓ 登録しました";
+                actionBtn.style.backgroundColor = "#9ca3af";
+            } else {
+                weakWords = weakWords.filter(w => w.fr !== word.fr);
+                localStorage.setItem('weakWords', JSON.stringify(weakWords));
+                actionBtn.innerText = "✓ 削除しました";
+                actionBtn.style.backgroundColor = "#9ca3af";
+            }
+        }
+
+        function speak(text, lang) {
+            return new Promise(resolve => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = lang;
+                utterance.rate = lang === 'fr-FR' ? 0.8 : 1.0; 
+                utterance.onend = resolve;
+                speechSynthesis.speak(utterance);
+            });
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function playLoop() {
+            if (!isPlaying || currentList.length === 0) return;
+
+            const word = currentList[currentIndex];
+            const frWordEl = document.getElementById('fr-word');
+            const jaWordEl = document.getElementById('ja-word');
+            const jaSection = document.getElementById('ja-section');
+            const weakBtn = document.getElementById('weak-btn');
+            const masterBtn = document.getElementById('master-btn');
+            const reviewActionBtn = document.getElementById('review-action-btn');
+            const normalActionRow = document.getElementById('normal-action-row');
+            const statusBar = document.getElementById('status-bar');
+            const synContainer = document.getElementById('synonyms-container');
+
+            const modeText = isReviewMode ? "⚠️ 苦手克服中" : "通常学習";
+            statusBar.innerText = `${modeText}: ${currentIndex + 1} / ${currentList.length} 語`;
+
+            jaWordEl.innerText = ""; 
+            jaSection.classList.remove('show');
+            normalActionRow.style.display = 'none';
+            weakBtn.style.visibility = 'hidden';
+            masterBtn.style.visibility = 'hidden';
+            reviewActionBtn.style.visibility = 'hidden';
+            synContainer.style.display = 'none'; // リセット時は類義語を隠す
+
+            weakBtn.innerText = "⚠️ 苦手へ";
+            weakBtn.style.backgroundColor = "#f59e0b";
+            masterBtn.innerText = "★ マスター";
+            masterBtn.style.backgroundColor = "#facc15";
+            reviewActionBtn.innerText = "✓ 覚えた（リストから外す）";
+            reviewActionBtn.style.backgroundColor = "#3b82f6";
+
+            frWordEl.className = `fr-word ${word.gender}`;
+            jaWordEl.className = `ja-word ${word.gender}`;
+
+            frWordEl.innerText = word.fr;
+            document.getElementById('ipa').innerText = word.ipa;
+            
+            await speak(word.fr, 'fr-FR');
+            if (!isPlaying) return;
+
+            await sleep(delaySeconds * 1000);
+            if (!isPlaying) return;
+
+            jaWordEl.innerText = word.ja;
+            document.getElementById('en-word').innerText = word.en;
+            
+            // 類義語データがある場合のみ、青いボックスを表示する
+            if (word.synonyms && word.synonyms.trim() !== "") {
+                document.getElementById('synonyms-text').innerText = word.synonyms;
+                synContainer.style.display = 'block';
+            }
+
+            document.getElementById('example-fr').innerText = word.ex_fr;
+            document.getElementById('example-ja').innerText = word.ex_ja;
+            document.getElementById('note').innerText = `【レベル: ${word.level}】 ${word.note}`;
+            
+            jaSection.classList.add('show');
+            if (isReviewMode) {
+                reviewActionBtn.style.visibility = 'visible';
+            } else {
+                normalActionRow.style.display = 'flex';
+                weakBtn.style.visibility = 'visible';
+                masterBtn.style.visibility = 'visible';
+            }
+
+            await speak(word.ja, 'ja-JP');
+            if (!isPlaying) return;
+
+            await sleep(nextDelaySeconds * 1000);
+            if (!isPlaying) return;
+
+            // マスター登録された単語は、このセッション中の通常リストからも除外する
+            if (!isReviewMode && isMastered(word)) {
+                currentList = currentList.filter(w => !isMastered(w));
+                if (currentList.length === 0) {
+                    isPlaying = false;
+                    alert('このカテゴリーの単語をすべてマスターしました。');
+                    goHome();
+                    return;
+                }
+                currentIndex = currentIndex % currentList.length;
+            } else {
+                currentIndex = (currentIndex + 1) % currentList.length;
+            }
+            playLoop(); 
+        }
+
+        function togglePlay() {
+            const btn = document.getElementById('play-btn');
+            if (isPlaying) {
+                isPlaying = false;
+                speechSynthesis.cancel();
+                btn.innerText = "▶ 再開する";
+                btn.style.backgroundColor = "#10b981";
+            } else {
+                isPlaying = true;
+                btn.innerText = "■ ストップ";
+                btn.style.backgroundColor = "#ef4444";
+                playLoop();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -7,15 +7,15 @@
     <style>
         body { font-family: -apple-system, sans-serif; background-color: #ffffff; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; color: #333; }
         #setup-screen, #learn-screen { width: 100%; max-width: 400px; }
-        #learn-screen { display: none; text-align: center; margin-top: 2vh; }
-        h1 { font-size: 1.5em; color: #2c3e50; text-align: center; margin-bottom: 20px; }
-        .select-box { width: 100%; padding: 15px; font-size: 1.1em; border-radius: 10px; border: 1px solid #ccc; margin-bottom: 20px; }
-        .fr-word { font-size: 2.5em; font-weight: bold; margin-bottom: 10px; }
-        .ja-section { visibility: hidden; opacity: 0; transition: opacity 0.3s; border-top: 2px solid #eee; padding-top: 20px; min-height: 200px; }
+        #learn-screen { display: none; text-align: center; margin-top: 10px; }
+        h1 { font-size: 1.5em; color: #2c3e50; text-align: center; }
+        .fr-word { font-size: 2.5em; font-weight: bold; margin-bottom: 5px; }
+        .ipa { font-size: 1.2em; color: #666; margin-bottom: 15px; }
+        .ja-section { visibility: hidden; opacity: 0; transition: opacity 0.3s; border-top: 2px solid #eee; padding-top: 15px; text-align: left; }
         .ja-section.show { visibility: visible; opacity: 1; }
-        .synonyms-box { background: #eef2ff; color: #3730a3; padding: 10px; border-radius: 8px; font-weight: bold; margin: 15px 0; }
+        .synonyms-box { background: #eef2ff; color: #3730a3; padding: 10px; border-radius: 8px; font-weight: bold; margin: 10px 0; }
+        .note { font-size: 0.9em; background: #f8f9fa; padding: 10px; border-radius: 8px; margin-top: 10px; }
         .btn { padding: 15px; font-size: 1.1em; font-weight: bold; border: none; border-radius: 25px; cursor: pointer; color: white; width: 100%; margin-bottom: 10px; }
-        .slider-container { margin: 20px 0; color: #666; text-align: center; }
     </style>
 </head>
 <body>
@@ -24,42 +24,32 @@
         <h1>📚 語彙マスター</h1>
         <div id="loading-msg">⏳ データ読み込み中...</div>
         <div id="menu-content" style="display: none;">
-            <select id="list-select" class="select-box"></select>
-            <div class="slider-container">
-                日本語待機: <span id="delay-val">0.5</span>秒<br>
-                <input type="range" id="delay-slider" min="0" max="2" step="0.1" value="0.5" style="width:80%" oninput="updateDelay()">
-            </div>
-            <button class="btn" style="background-color: #3b82f6;" onclick="startLearning()">学習を開始する</button>
+            <select id="list-select" style="width:100%; padding:15px; margin-bottom:20px;"></select>
+            <button class="btn" style="background-color: #3b82f6;" onclick="startLearning()">学習を開始</button>
             <button class="btn" style="background-color: #8b5cf6;" onclick="startReviewing()">苦手リストを復習</button>
         </div>
     </div>
 
     <div id="learn-screen">
-        <div id="status-bar" style="color:#888; font-size:0.9em; margin-bottom:10px;"></div>
         <div id="fr-word" class="fr-word"></div>
+        <div id="ipa" class="ipa"></div>
         <div id="ja-section" class="ja-section">
             <div id="ja-word" style="font-size:1.8em; font-weight:bold;"></div>
+            <div id="en-word" style="color:#666;"></div>
             <div id="synonyms-container" class="synonyms-box" style="display:none;">💡 類義語: <span id="synonyms-text"></span></div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn" style="background-color: #f59e0b; width:50%;" onclick="handleAction('weak')">⚠️ 苦手</button>
+            <div id="ex-fr" style="margin-top:10px; font-style:italic;"></div>
+            <div id="ex-ja" style="margin-bottom:10px;"></div>
+            <div id="note" class="note"></div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" style="background-color: #f59e0b; width:50%;" onclick="handleAction('weak')">⚠️ 苦手へ</button>
                 <button class="btn" style="background-color: #10b981; width:50%;" onclick="handleAction('master')">★ マスター</button>
             </div>
         </div>
-        <button class="btn" style="background-color: #6b7280;" onclick="goHome()">🏠 メニューに戻る</button>
+        <button class="btn" style="background-color: #6b7280; margin-top:10px;" onclick="location.reload()">🏠 メニューに戻る</button>
     </div>
 
     <script>
-        let wordDatabase = {}, currentList = [], currentIndex = 0, isPlaying = false, delaySeconds = 0.5;
-
-        async function speak(text, lang) {
-            return new Promise(resolve => {
-                const u = new SpeechSynthesisUtterance(text);
-                u.lang = lang;
-                u.rate = 0.9;
-                u.onend = resolve;
-                speechSynthesis.speak(u);
-            });
-        }
+        let wordDatabase = {}, currentList = [], currentIndex = 0, isPlaying = false;
 
         window.onload = async () => {
             const res = await fetch('words.csv?v=' + new Date().getTime());
@@ -86,37 +76,41 @@
             launch();
         }
 
-        function startReviewing() {
-            currentList = JSON.parse(localStorage.getItem('weakWords') || '[]');
-            launch();
-        }
+        function startReviewing() { currentList = JSON.parse(localStorage.getItem('weakWords') || '[]'); launch(); }
 
         function launch() {
             document.getElementById('setup-screen').style.display = 'none';
             document.getElementById('learn-screen').style.display = 'block';
-            isPlaying = true;
-            currentIndex = 0;
-            playLoop();
+            isPlaying = true; currentIndex = 0; playLoop();
         }
 
         async function playLoop() {
             if(!isPlaying) return;
             const word = currentList[currentIndex % currentList.length];
             document.getElementById('fr-word').innerText = word.fr;
+            document.getElementById('ipa').innerText = word.ipa;
             document.getElementById('ja-section').classList.remove('show');
-            document.getElementById('synonyms-container').style.display = 'none';
             
-            await speak(word.fr, 'fr-FR');
-            await new Promise(r => setTimeout(r, delaySeconds * 1000));
-            
+            await new Promise(r => setTimeout(r, 1000));
             document.getElementById('ja-word').innerText = word.ja;
+            document.getElementById('en-word').innerText = "(" + word.en + ")";
+            document.getElementById('ex-fr').innerText = word.ex_fr;
+            document.getElementById('ex-ja').innerText = word.ex_ja;
+            document.getElementById('note').innerText = `【Level: ${word.level}】 ${word.note}`;
+            
             if(word.synonyms) {
                 document.getElementById('synonyms-text').innerText = word.synonyms;
                 document.getElementById('synonyms-container').style.display = 'block';
+            } else {
+                document.getElementById('synonyms-container').style.display = 'none';
             }
+            
             document.getElementById('ja-section').classList.add('show');
-            await speak(word.ja, 'ja-JP');
-            await new Promise(r => setTimeout(r, 1000));
+            // 音声再生を追加
+            speechSynthesis.speak(new SpeechSynthesisUtterance(word.fr));
+            await new Promise(r => setTimeout(r, 2000));
+            speechSynthesis.speak(new SpeechSynthesisUtterance(word.ja));
+            await new Promise(r => setTimeout(r, 2000));
             
             currentIndex++;
             playLoop();
@@ -128,12 +122,9 @@
             if(!storage.some(w => w.fr === word.fr)) {
                 storage.push(word);
                 localStorage.setItem(type === 'weak' ? 'weakWords' : 'masterWords', JSON.stringify(storage));
-                alert(type === 'weak' ? "苦手に追加" : "マスター済みに移動");
+                alert("保存しました");
             }
         }
-
-        function updateDelay() { delaySeconds = document.getElementById('delay-slider').value; document.getElementById('delay-val').innerText = delaySeconds; }
-        function goHome() { isPlaying = false; location.reload(); }
     </script>
 </body>
 </html>

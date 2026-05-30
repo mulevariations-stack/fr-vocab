@@ -53,7 +53,7 @@
         }
         .btn-start { background-color: #3b82f6; color: white; margin-top: 20px; }
         .btn-play { background-color: #10b981; color: white; }
-        .btn-action { color: white; visibility: hidden; }
+        .btn-action { color: white; visibility: hidden; } /* 文字色を白に修正済 */
         .btn-home { background-color: #6b7280; color: white; margin-top: 20px; font-size: 1em; padding: 10px; }
         .btn-review { background-color: #8b5cf6; color: white; margin-top: 10px; }
         
@@ -74,13 +74,19 @@
         <select id="list-select" class="select-box">
             <option value="A1_verbs">A1 基礎・最重要動詞 (5語)</option>
             <option value="A1_nouns_people">A1 人・家族に関する名詞 (5語)</option>
-            <option value="A1_nouns_time">A1 時間・場所に関する名詞 (5語)</option>
+            <option value="A2_mobility_business">A2 モビリティ・ビジネス (5語)</option>
         </select>
 
         <div class="slider-container" style="text-align: center;">
             <label style="font-weight:bold; color:#555;">日本語表示までの待機時間</label><br>
             <span id="delay-val-setup" style="font-size:1.5em; font-weight:bold; color:#3b82f6;">0.5</span> 秒<br>
             <input type="range" id="delay-slider-setup" min="0" max="2" step="0.1" value="0.5" oninput="updateDelaySetup()">
+        </div>
+
+        <div class="slider-container" style="text-align: center; margin-top: 20px;">
+            <label style="font-weight:bold; color:#555;">次の単語に進むまでの待機時間</label><br>
+            <span id="next-delay-val-setup" style="font-size:1.5em; font-weight:bold; color:#10b981;">0.0</span> 秒<br>
+            <input type="range" id="next-delay-slider-setup" min="0" max="2" step="0.1" value="0.0" oninput="updateNextDelaySetup()">
         </div>
 
         <button class="btn btn-start" onclick="startLearning()">学習を開始する</button>
@@ -130,12 +136,12 @@
                 { fr: "un père", ipa: "[pɛʁ]", ja: "父", en: "father", level: "A1", ex_fr: "Mon père est médecin.", ex_ja: "私の父は医者です。", note: "英語のpaternalと同語源。", gender: "male" },
                 { fr: "une mère", ipa: "[mɛʁ]", ja: "母", en: "mother", level: "A1", ex_fr: "Sa mère est gentille.", ex_ja: "彼の母は優しい。", note: "英語のmaternalと同語源。", gender: "female" }
             ],
-            "A1_nouns_time": [
-                { fr: "un jour", ipa: "[ʒuʁ]", ja: "日・1日", en: "day", level: "A1", ex_fr: "Un jour je viendrai.", ex_ja: "いつか私は来る。", note: "英語のjournalなどの語源。", gender: "male" },
-                { fr: "une heure", ipa: "[œʁ]", ja: "時間・時刻", en: "hour", level: "A1", ex_fr: "Il est une heure.", ex_ja: "1時です。", note: "英語のhourと同語源・hは発音しない。", gender: "female" },
-                { fr: "un an", ipa: "[ɑ̃]", ja: "年(単位)", en: "year", level: "A1", ex_fr: "J'ai vingt ans.", ex_ja: "私は20歳です。", note: "英語のannualと同語源。", gender: "male" },
-                { fr: "une ville", ipa: "[vil]", ja: "街・都市", en: "city", level: "A1", ex_fr: "J'habite dans une ville.", ex_ja: "私は街に住んでいる。", note: "英語のvillageと同語源。", gender: "female" },
-                { fr: "une maison", ipa: "[mɛzɔ̃]", ja: "家", en: "house", level: "A1", ex_fr: "Je rentre à la maison.", ex_ja: "家に帰る。", note: "英語のmansionと同語源。", gender: "female" }
+            "A2_mobility_business": [
+                { fr: "un véhicule", ipa: "[veikyl]", ja: "車両・乗り物", en: "vehicle", level: "A2", ex_fr: "Ce véhicule est électrique.", ex_ja: "この車両は電気自動車です。", note: "英語の vehicle と同語源。hは発音しない。", gender: "male" },
+                { fr: "électrique", ipa: "[elɛktʁik]", ja: "電気の", en: "electric", level: "A2", ex_fr: "Le marché des voitures électriques.", ex_ja: "電気自動車の市場。", note: "モビリティ業界で必須の形容詞。", gender: "neutral" },
+                { fr: "un contrat", ipa: "[kɔ̃tʁa]", ja: "契約", en: "contract", level: "A2", ex_fr: "Nous avons signé un contrat.", ex_ja: "私たちは契約に署名した。", note: "ビジネスで頻出。tは発音しない。", gender: "male" },
+                { fr: "un projet", ipa: "[pʁɔʒɛ]", ja: "プロジェクト", en: "project", level: "A2", ex_fr: "Le projet commence demain.", ex_ja: "プロジェクトは明日始まる。", note: "英語の project と同語源。", gender: "male" },
+                { fr: "une rentabilité", ipa: "[ʁɑ̃tabilite]", ja: "収益性", en: "profitability", level: "B1", ex_fr: "On doit améliorer la rentabilité.", ex_ja: "収益性を向上させる必要がある。", note: "英語の rent (賃貸)と同根。利益・収益管理の重要語。", gender: "female" }
             ]
         };
 
@@ -143,9 +149,9 @@
         let currentIndex = 0;
         let isPlaying = false;
         let delaySeconds = 0.5;
-        let isReviewMode = false; // 苦手リストの復習中かどうか
+        let nextDelaySeconds = 0.0;
+        let isReviewMode = false; 
 
-        // ページ読み込み時に苦手リストの数を表示
         window.onload = function() { updateWeakCount(); };
 
         function updateWeakCount() {
@@ -165,6 +171,11 @@
         function updateDelaySetup() {
             delaySeconds = document.getElementById('delay-slider-setup').value;
             document.getElementById('delay-val-setup').innerText = delaySeconds;
+        }
+
+        function updateNextDelaySetup() {
+            nextDelaySeconds = document.getElementById('next-delay-slider-setup').value;
+            document.getElementById('next-delay-val-setup').innerText = nextDelaySeconds;
         }
 
         function goHome() {
@@ -202,14 +213,12 @@
             playLoop();
         }
 
-        // 苦手リストへの「追加」と「削除」を管理する関数
         function handleAction() {
             const word = currentList[currentIndex];
             let weakWords = JSON.parse(localStorage.getItem('weakWords')) || [];
             const actionBtn = document.getElementById('action-btn');
 
             if (!isReviewMode) {
-                // 通常学習時：苦手リストに追加する
                 const exists = weakWords.some(w => w.fr === word.fr);
                 if (!exists) {
                     weakWords.push(word);
@@ -218,7 +227,6 @@
                 actionBtn.innerText = "✓ 登録しました";
                 actionBtn.style.backgroundColor = "#9ca3af";
             } else {
-                // 復習モード時：苦手リストから削除する（覚えた）
                 weakWords = weakWords.filter(w => w.fr !== word.fr);
                 localStorage.setItem('weakWords', JSON.stringify(weakWords));
                 actionBtn.innerText = "✓ 削除しました";
@@ -250,22 +258,19 @@
             const actionBtn = document.getElementById('action-btn');
             const statusBar = document.getElementById('status-bar');
 
-            // モードに応じたステータス表示
             const modeText = isReviewMode ? "⚠️ 苦手克服中" : "通常学習";
             statusBar.innerText = `${modeText}: ${currentIndex + 1} / ${currentList.length} 語`;
 
-            // UIリセット
             jaWordEl.innerText = ""; 
             jaSection.classList.remove('show');
             actionBtn.style.visibility = 'hidden';
 
-            // モードによってアクションボタンの見た目と機能を変える
             if (isReviewMode) {
                 actionBtn.innerText = "✓ 覚えた（リストから外す）";
-                actionBtn.style.backgroundColor = "#3b82f6"; // 青色
+                actionBtn.style.backgroundColor = "#3b82f6"; 
             } else {
                 actionBtn.innerText = "⚠️ 苦手リストに追加";
-                actionBtn.style.backgroundColor = "#f59e0b"; // オレンジ色
+                actionBtn.style.backgroundColor = "#f59e0b"; 
             }
 
             frWordEl.className = `fr-word ${word.gender}`;
@@ -287,9 +292,12 @@
             document.getElementById('note').innerText = `【レベル: ${word.level}】 ${word.note}`;
             
             jaSection.classList.add('show');
-            actionBtn.style.visibility = 'visible'; // ここでボタンを表示
+            actionBtn.style.visibility = 'visible'; 
 
             await speak(word.ja, 'ja-JP');
+            if (!isPlaying) return;
+
+            await sleep(nextDelaySeconds * 1000);
             if (!isPlaying) return;
 
             currentIndex = (currentIndex + 1) % currentList.length;
